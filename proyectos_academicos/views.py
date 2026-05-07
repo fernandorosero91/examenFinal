@@ -1,10 +1,18 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.utils import timezone
+from django.db.models import Avg
+from django.http import HttpResponse
+import csv
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.units import inch
 from .models import Proyecto, Comentario
 from .forms import ProyectoForm, ProyectoDocenteForm, ComentarioForm
 
@@ -291,3 +299,154 @@ class ComentarioCreateView(LoginRequiredMixin, CreateView):
     
     def get_success_url(self):
         return reverse_lazy('proyecto_detail', kwargs={'pk': self.proyecto.pk})
+
+
+def es_docente(user):
+    """
+    Helper function para verificar si un usuario es docente.
+    """
+    return user.groups.filter(name='docente').exists()
+
+
+@login_required
+@user_passes_test(es_docente)
+def estadisticas_view(request):
+    """
+    Vista de panel de estadísticas para docentes.
+    Muestra métricas agregadas de proyectos.
+    Requisitos: 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2
+    """
+    # Calcular total de proyectos por estado
+    total_enviados = Proyecto.objects.filter(estado='enviado').count()
+    total_revision = Proyecto.objects.filter(estado='revision').count()
+    total_aprobados = Proyecto.objects.filter(estado='aprobado').count()
+    
+    # Calcular promedio de calificaciones
+    promedio_calificacion = Proyecto.objects.filter(
+        calificacion__isnull=False
+    ).aggregate(Avg('calificacion'))['calificacion__avg']
+    
+    # Calcular total de proyectos sin calificar
+    sin_calificar = Proyecto.objects.filter(calificacion__isnull=True).count()
+    
+    # Total de proyectos
+    total_proyectos = Proyecto.objects.count()
+    
+    # Pasar estadísticas al template
+    context = {
+        'total_enviados': total_enviados,
+        'total_revision': total_revision,
+        'total_aprobados': total_aprobados,
+        'promedio_calificacion': promedio_calificacion,
+        'sin_calificar': sin_calificar,
+        'total_proyectos': total_proyectos,
+    }
+    
+    return render(request, 'estadisticas.html', context)
+
+
+@login_required
+@user_passes_test(es_docente)
+def exportar_csv_view(request):
+    """
+    Vista para exportar proyectos a formato CSV.
+    Solo accesible para docentes.
+    Requisitos: 8.1, 8.2, 8.3, 8.4, 11.1, 11.2
+    """
+    # Crear HttpResponse con content_type CSV
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="proyectos.csv"'
+    
+    # Crear writer CSV
+    writer = csv.writer(response)
+    
+    # Escribir header row
+    writer.writerow(['Título', 'Estudiante', 'Estado', 'Calificación', 'Fecha Envío'])
+    
+    # Iterar sobre todos los proyectos y escribir filas
+    for proyecto in Proyecto.objects.all().select_related('estudiante'):
+        writer.writerow([
+            proyecto.titulo,
+            proyecto.estudiante.get_full_name() or proyecto.estudiante.username,
+            proyecto.get_estado_display(),
+            proyecto.calificacion if proyecto.calificacion else 'Sin calificar',
+            proyecto.fecha_envio.strftime('%d/%m/%Y %H:%M')
+        ])
+    
+    return response
+
+
+@login_required
+@user_passes_test(es_docente)
+def exportar_pdf_view(request):
+    """
+    Vista para exportar proyectos a formato PDF con encabezado institucional.
+    Solo accesible para docentes.
+    Requisitos: 9.1, 9.2, 9.3, 9.4, 9.5, 11.1, 11.2
+    """
+    # Crear HttpResponse con content_type PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="proyectos.pdf"'
+    
+    # Crear documento PDF
+    doc = SimpleDocTemplate(response, pagesize=A4)
+    elements = []
+    
+    # Estilos
+    styles = getSampleStyleSheet()
+    
+    # Encabezado institucional
+    header_style = styles['Heading1']
+    header = Paragraph("Sistema de Gestión de Proyectos Académicos", header_style)
+    elements.append(header)
+    
+    subheader_style = styles['Heading2']
+    subheader = Paragraph("Reporte de Proyectos", subheader_style)
+    elements.append(subheader)
+    elements.append(Spacer(1, 0.3 * inch))
+    
+    # Preparar datos para la tabla
+    data = [['Título', 'Estudiante', 'Estado', 'Calificación', 'Fecha Envío']]
+    
+    for proyecto in Proyecto.objects.all().select_related('estudiante'):
+        data.append([
+            proyecto.titulo[:30] + '...' if len(proyecto.titulo) > 30 else proyecto.titulo,
+            proyecto.estudiante.get_full_name() or proyecto.estudiante.username,
+            proyecto.get_estado_display(),
+            str(proyecto.calificacion) if proyecto.calificacion else 'Sin calificar',
+            proyecto.fecha_envio.strftime('%d/%m/%Y')
+        ])
+    
+    # Crear tabla
+    table = Table(data, colWidths=[2.2*inch, 1.5*inch, 1.2*inch, 1*inch, 1*inch])
+    
+    # Estilizar tabla
+    table.setStyle(TableStyle([
+        # Encabezado
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a5f')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        
+        # Cuerpo de la tabla
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+        
+        # Bordes
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    
+    elements.append(table)
+    
+    # Construir PDF
+    doc.build(elements)
+    
+    return response

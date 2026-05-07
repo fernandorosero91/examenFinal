@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     postgresql-client \
     libpq-dev \
+    dnsutils \
+    iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar requirements.txt primero
@@ -27,8 +29,8 @@ RUN mkdir -p /app/staticfiles
 # Dar permisos al entrypoint
 RUN chmod +x /app/entrypoint.sh
 
-# Cambiar al directorio del proyecto Django
-WORKDIR /app/evaluaciones__nombre__estudiantes
+# El WORKDIR debe ser /app donde está manage.py
+WORKDIR /app
 
 EXPOSE 8000
 
