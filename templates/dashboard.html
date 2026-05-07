@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Sistema de Gestión de Proyectos Académicos{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-md p-8 text-center">
+        <h1 class="text-2xl font-bold text-blue-900 mb-4">
+            {% if user_role == 'docente' %}
+                Panel del Docente
+            {% elif user_role == 'estudiante' %}
+                Panel del Estudiante
+            {% else %}
+                Panel de Usuario
+            {% endif %}
+        </h1>
+        
+        <p class="text-gray-600 mb-6">{{ message }}</p>
+
+        {% if user_role == 'docente' %}
+            <div class="inline-flex items-center bg-orange-100 text-orange-700 px-4 py-2 rounded-full text-sm font-medium">
+                <span class="mr-2">👨‍🏫</span> Rol: Docente
+            </div>
+        {% elif user_role == 'estudiante' %}
+            <div class="inline-flex items-center bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-medium">
+                <span class="mr-2">👨‍🎓</span> Rol: Estudiante
+            </div>
+        {% else %}
+            <div class="inline-flex items-center bg-gray-100 text-gray-700 px-4 py-2 rounded-full text-sm font-medium">
+                <span class="mr-2">👤</span> Sin rol asignado
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
