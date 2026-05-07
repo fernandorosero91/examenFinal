@@ -36,11 +36,6 @@ RUN mkdir -p /app/staticfiles /app/media
 # Dar permisos al entrypoint
 RUN chmod +x /app/entrypoint.sh
 
-# Crear usuario no-root para seguridad
-RUN adduser --disabled-password --gecos '' appuser && \
-    chown -R appuser:appuser /app
-USER appuser
-
 EXPOSE 8000
 
 ENTRYPOINT ["/app/entrypoint.sh"]

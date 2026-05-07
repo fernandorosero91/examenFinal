@@ -8,17 +8,13 @@ echo "DB_NAME: $DB_NAME"
 echo "DB_USER: $DB_USER"
 echo "==========================================="
 
-# Probar diferentes hosts de PostgreSQL
-echo "Probando conectividad a PostgreSQL..."
-python test_db_connection.py
-
 # Función para probar conectividad
 test_postgres() {
     PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null
 }
 
 echo "Esperando a que PostgreSQL esté disponible..."
-MAX_RETRIES=10  # Reducido a 10 intentos (20 segundos)
+MAX_RETRIES=30
 RETRY_COUNT=0
 
 while ! test_postgres; do
@@ -29,7 +25,7 @@ while ! test_postgres; do
     echo "Probando hosts alternativos..."
     
     # Probar hosts alternativos
-    for alt_host in "postgres" "postgresql" "db" "database" "localhost"; do
+    for alt_host in "postgres" "postgresql" "db" "database" "localhost" "127.0.0.1"; do
         echo "Probando host alternativo: $alt_host"
         if PGPASSWORD=$DB_PASSWORD psql -h "$alt_host" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; then
             echo "✅ ¡Conexión exitosa con $alt_host!"
