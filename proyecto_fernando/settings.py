@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'crispy_forms',
     'crispy_tailwind',
-    'proyectos_academicos',
+    'proyectos_academicos.apps.ProyectosAcademicosConfig',
 ]
 
 MIDDLEWARE = [
