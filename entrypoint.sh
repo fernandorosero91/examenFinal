@@ -1,13 +1,44 @@
 #!/bin/bash
 set -e
 
+echo "=== Información de conexión a PostgreSQL ==="
+echo "DB_HOST: $DB_HOST"
+echo "DB_PORT: $DB_PORT"
+echo "DB_NAME: $DB_NAME"
+echo "DB_USER: $DB_USER"
+echo "==========================================="
+
+# Intentar resolver el hostname
+echo "Intentando resolver hostname..."
+nslookup $DB_HOST || echo "⚠️  No se pudo resolver el hostname con nslookup"
+ping -c 1 $DB_HOST || echo "⚠️  No se pudo hacer ping al host"
+
 echo "Esperando a que PostgreSQL esté disponible..."
+# Intentar conectar a PostgreSQL con timeout
+MAX_RETRIES=30
+RETRY_COUNT=0
+
 until PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; do
-  echo "PostgreSQL no está disponible - esperando..."
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+    echo "❌ ERROR: No se pudo conectar a PostgreSQL después de $MAX_RETRIES intentos"
+    echo ""
+    echo "Diagnóstico:"
+    echo "  - Verificar que la base de datos esté ejecutándose"
+    echo "  - Verificar que ambos contenedores estén en la misma red Docker"
+    echo "  - Verificar las credenciales de la base de datos"
+    echo ""
+    echo "Intentando continuar sin esperar a PostgreSQL..."
+    echo "⚠️  La aplicación puede fallar si PostgreSQL no está disponible"
+    break
+  fi
+  echo "PostgreSQL no está disponible - esperando... (intento $RETRY_COUNT/$MAX_RETRIES)"
   sleep 2
 done
 
-echo "PostgreSQL está disponible!"
+if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+  echo "✓ PostgreSQL está disponible!"
+fi
 
 echo "Aplicando migraciones..."
 python manage.py migrate --noinput
