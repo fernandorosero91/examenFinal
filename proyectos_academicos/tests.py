@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth.models import User, Group
 from django.core import mail
+from django import forms
 from .models import Proyecto, Comentario
 import tempfile
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -297,3 +298,328 @@ class DashboardViewTestCase(TestCase):
         
         self.assertEqual(response.context['total_proyectos'], 1)
         self.assertContains(response, 'Total de Proyectos')
+
+
+
+class ComentarioCreateViewTestCase(TestCase):
+    """
+    Tests para verificar la vista de creación de comentarios.
+    Requisitos: 5.1, 5.2, 5.4, 5.5, 12.2, 14.3, 14.4, 15.6
+    """
+    
+    def setUp(self):
+        """Configurar datos de prueba"""
+        # Obtener o crear grupos
+        self.grupo_estudiante, _ = Group.objects.get_or_create(name='estudiante')
+        self.grupo_docente, _ = Group.objects.get_or_create(name='docente')
+        
+        # Crear usuarios
+        self.estudiante = User.objects.create_user(
+            username='estudiante1',
+            email='estudiante1@test.com',
+            password='testpass123',
+            first_name='Juan',
+            last_name='Pérez'
+        )
+        self.estudiante.groups.add(self.grupo_estudiante)
+        
+        self.docente = User.objects.create_user(
+            username='docente1',
+            email='docente1@test.com',
+            password='testpass123',
+            first_name='María',
+            last_name='García'
+        )
+        self.docente.groups.add(self.grupo_docente)
+        
+        # Crear proyectos con diferentes estados
+        pdf_content = b'%PDF-1.4 fake pdf content'
+        
+        pdf_file1 = SimpleUploadedFile(
+            'proyecto_enviado.pdf',
+            pdf_content,
+            content_type='application/pdf'
+        )
+        self.proyecto_enviado = Proyecto.objects.create(
+            titulo='Proyecto Enviado',
+            descripcion='Proyecto en estado enviado',
+            estudiante=self.estudiante,
+            documento=pdf_file1,
+            estado='enviado'
+        )
+        
+        pdf_file2 = SimpleUploadedFile(
+            'proyecto_revision.pdf',
+            pdf_content,
+            content_type='application/pdf'
+        )
+        self.proyecto_revision = Proyecto.objects.create(
+            titulo='Proyecto en Revisión',
+            descripcion='Proyecto en estado revisión',
+            estudiante=self.estudiante,
+            documento=pdf_file2,
+            estado='revision'
+        )
+        
+        pdf_file3 = SimpleUploadedFile(
+            'proyecto_aprobado.pdf',
+            pdf_content,
+            content_type='application/pdf'
+        )
+        self.proyecto_aprobado = Proyecto.objects.create(
+            titulo='Proyecto Aprobado',
+            descripcion='Proyecto en estado aprobado',
+            estudiante=self.estudiante,
+            documento=pdf_file3,
+            estado='aprobado'
+        )
+    
+    def test_comentario_create_requiere_autenticacion(self):
+        """
+        Verificar que la creación de comentarios requiere autenticación.
+        Requisito: 15.6
+        """
+        response = self.client.post(
+            f'/proyectos/{self.proyecto_enviado.pk}/comentarios/crear/',
+            {'texto': 'Comentario de prueba'}
+        )
+        # Debe redirigir al login
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+    
+    def test_comentario_create_asigna_usuario_automaticamente(self):
+        """
+        Verificar que el usuario se asigna automáticamente al comentario.
+        Requisito: 5.1
+        """
+        self.client.login(username='docente1', password='testpass123')
+        
+        response = self.client.post(
+            f'/proyectos/{self.proyecto_enviado.pk}/comentarios/crear/',
+            {'texto': 'Comentario del docente'}
+        )
+        
+        # Verificar redirección exitosa
+        self.assertEqual(response.status_code, 302)
+        
+        # Verificar que el comentario se creó con el usuario correcto
+        comentario = Comentario.objects.get(texto='Comentario del docente')
+        self.assertEqual(comentario.usuario, self.docente)
+        self.assertEqual(comentario.proyecto, self.proyecto_enviado)
+    
+    def test_comentario_create_asigna_proyecto_automaticamente(self):
+        """
+        Verificar que el proyecto se asigna automáticamente al comentario.
+        Requisito: 5.1
+        """
+        self.client.login(username='estudiante1', password='testpass123')
+        
+        response = self.client.post(
+            f'/proyectos/{self.proyecto_revision.pk}/comentarios/crear/',
+            {'texto': 'Comentario del estudiante'}
+        )
+        
+        # Verificar que el comentario se creó con el proyecto correcto
+        comentario = Comentario.objects.get(texto='Comentario del estudiante')
+        self.assertEqual(comentario.proyecto, self.proyecto_revision)
+    
+    def test_comentario_create_establece_fecha_automaticamente(self):
+        """
+        Verificar que la fecha se establece automáticamente.
+        Requisito: 5.2
+        """
+        self.client.login(username='docente1', password='testpass123')
+        
+        response = self.client.post(
+            f'/proyectos/{self.proyecto_enviado.pk}/comentarios/crear/',
+            {'texto': 'Comentario con fecha automática'}
+        )
+        
+        comentario = Comentario.objects.get(texto='Comentario con fecha automática')
+        self.assertIsNotNone(comentario.fecha)
+    
+    def test_comentario_create_bloqueado_en_proyecto_aprobado(self):
+        """
+        Verificar que no se pueden crear comentarios en proyectos aprobados.
+        Requisitos: 5.4, 5.5
+        """
+        self.client.login(username='docente1', password='testpass123')
+        
+        # Intentar crear comentario en proyecto aprobado
+        response = self.client.post(
+            f'/proyectos/{self.proyecto_aprobado.pk}/comentarios/crear/',
+            {'texto': 'Este comentario no debería crearse'}
+        )
+        
+        # Debe redirigir al detalle del proyecto
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(f'/proyectos/{self.proyecto_aprobado.pk}/', response.url)
+        
+        # Verificar que el comentario NO se creó
+        self.assertFalse(
+            Comentario.objects.filter(texto='Este comentario no debería crearse').exists()
+        )
+    
+    def test_comentario_create_muestra_mensaje_error_proyecto_aprobado(self):
+        """
+        Verificar que se muestra mensaje de error al intentar comentar proyecto aprobado.
+        Requisito: 5.5
+        """
+        self.client.login(username='docente1', password='testpass123')
+        
+        response = self.client.post(
+            f'/proyectos/{self.proyecto_aprobado.pk}/comentarios/crear/',
+            {'texto': 'Comentario bloqueado'},
+            follow=True
+        )
+        
+        # Verificar que se muestra mensaje de error
+        messages = list(response.context['messages'])
+        self.assertEqual(len(messages), 1)
+        self.assertIn('No se pueden agregar comentarios a proyectos aprobados', str(messages[0]))
+    
+    def test_comentario_create_permite_estado_enviado(self):
+        """
+        Verificar que se pueden crear comentarios en proyectos con estado 'enviado'.
+        Requisito: 5.4
+        """
+        self.client.login(username='docente1', password='testpass123')
+        
+        response = self.client.post(
+            f'/proyectos/{self.proyecto_enviado.pk}/comentarios/crear/',
+            {'texto': 'Comentario en proyecto enviado'}
+        )
+        
+        # Verificar que el comentario se creó
+        self.assertTrue(
+            Comentario.objects.filter(texto='Comentario en proyecto enviado').exists()
+        )
+    
+    def test_comentario_create_permite_estado_revision(self):
+        """
+        Verificar que se pueden crear comentarios en proyectos con estado 'revision'.
+        Requisito: 5.4
+        """
+        self.client.login(username='docente1', password='testpass123')
+        
+        response = self.client.post(
+            f'/proyectos/{self.proyecto_revision.pk}/comentarios/crear/',
+            {'texto': 'Comentario en proyecto en revisión'}
+        )
+        
+        # Verificar que el comentario se creó
+        self.assertTrue(
+            Comentario.objects.filter(texto='Comentario en proyecto en revisión').exists()
+        )
+    
+    def test_comentario_create_redirige_a_proyecto_detail(self):
+        """
+        Verificar que después de crear un comentario se redirige al detalle del proyecto.
+        Requisito: 15.6
+        """
+        self.client.login(username='estudiante1', password='testpass123')
+        
+        response = self.client.post(
+            f'/proyectos/{self.proyecto_enviado.pk}/comentarios/crear/',
+            {'texto': 'Comentario con redirección'}
+        )
+        
+        # Verificar redirección al detalle del proyecto
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f'/proyectos/{self.proyecto_enviado.pk}/')
+    
+    def test_comentario_create_muestra_mensaje_exito(self):
+        """
+        Verificar que se muestra mensaje de éxito al crear comentario.
+        Requisito: 15.6
+        """
+        self.client.login(username='docente1', password='testpass123')
+        
+        response = self.client.post(
+            f'/proyectos/{self.proyecto_enviado.pk}/comentarios/crear/',
+            {'texto': 'Comentario exitoso'},
+            follow=True
+        )
+        
+        # Verificar mensaje de éxito
+        messages = list(response.context['messages'])
+        self.assertEqual(len(messages), 1)
+        self.assertIn('Comentario agregado exitosamente', str(messages[0]))
+    
+    def test_proyecto_detail_muestra_formulario_si_no_aprobado(self):
+        """
+        Verificar que el formulario de comentario se muestra si el proyecto no está aprobado.
+        Requisitos: 14.3, 5.3
+        """
+        self.client.login(username='docente1', password='testpass123')
+        
+        response = self.client.get(f'/proyectos/{self.proyecto_enviado.pk}/')
+        
+        # Verificar que el formulario está en el contexto
+        self.assertIn('comentario_form', response.context)
+        self.assertTrue(response.context['puede_comentar'])
+        
+        # Verificar que el formulario se muestra en el HTML
+        self.assertContains(response, 'Agregar Comentario')
+        self.assertContains(response, 'Enviar Comentario')
+    
+    def test_proyecto_detail_oculta_formulario_si_aprobado(self):
+        """
+        Verificar que el formulario de comentario NO se muestra si el proyecto está aprobado.
+        Requisitos: 14.4, 5.4
+        """
+        self.client.login(username='docente1', password='testpass123')
+        
+        response = self.client.get(f'/proyectos/{self.proyecto_aprobado.pk}/')
+        
+        # Verificar que no se puede comentar
+        self.assertFalse(response.context['puede_comentar'])
+        
+        # Verificar que el formulario NO está en el contexto
+        self.assertNotIn('comentario_form', response.context)
+        
+        # Verificar que se muestra el banner de advertencia
+        self.assertContains(response, 'Este proyecto está aprobado. No se pueden agregar más comentarios.')
+    
+    def test_comentario_form_usa_crispy_forms(self):
+        """
+        Verificar que el formulario de comentario usa crispy-forms.
+        Requisito: 12.2
+        """
+        self.client.login(username='docente1', password='testpass123')
+        
+        response = self.client.get(f'/proyectos/{self.proyecto_enviado.pk}/')
+        
+        # Verificar que el template usa crispy_forms_tags (div_id_texto es generado por crispy)
+        self.assertContains(response, 'div_id_texto')
+    
+    def test_comentario_form_tiene_campo_texto_textarea(self):
+        """
+        Verificar que el formulario tiene el campo 'texto' como Textarea.
+        Requisito: 12.2
+        """
+        from .forms import ComentarioForm
+        
+        form = ComentarioForm()
+        
+        # Verificar que el campo 'texto' existe
+        self.assertIn('texto', form.fields)
+        
+        # Verificar que es un Textarea
+        self.assertIsInstance(form.fields['texto'].widget, forms.Textarea)
+    
+    def test_comentario_form_tiene_placeholder(self):
+        """
+        Verificar que el campo texto tiene placeholder.
+        Requisito: 12.2
+        """
+        from .forms import ComentarioForm
+        
+        form = ComentarioForm()
+        
+        # Verificar que tiene placeholder
+        self.assertIn('placeholder', form.fields['texto'].widget.attrs)
+        self.assertEqual(
+            form.fields['texto'].widget.attrs['placeholder'],
+            'Escribe tu comentario aquí...'
+        )

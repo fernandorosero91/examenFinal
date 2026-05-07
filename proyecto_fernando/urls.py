@@ -20,6 +20,9 @@ urlpatterns = [
 
     # Dashboard - Requisito 1.3
     path('dashboard/', app_views.dashboard_redirect, name='dashboard'),
+    
+    # URLs de la aplicación proyectos_academicos
+    path('', include('proyectos_academicos.urls')),
 ]
 
 # Servir archivos media en desarrollo - Requisito 16.6

@@ -1,6 +1,12 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .models import Proyecto
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
+from django.urls import reverse_lazy
+from django.contrib import messages
+from django.utils import timezone
+from .models import Proyecto, Comentario
+from .forms import ProyectoForm, ProyectoDocenteForm, ComentarioForm
 
 
 @login_required
@@ -42,3 +48,246 @@ def dashboard_redirect(request):
             'proyectos': [],
             'total_proyectos': 0,
         })
+
+
+class ProyectoListView(LoginRequiredMixin, ListView):
+    """
+    Vista de lista de proyectos con filtros por estado y estudiante.
+    Requisitos: 7.1, 7.2, 7.3, 7.4, 15.1
+    """
+    model = Proyecto
+    template_name = 'proyectos/proyecto_list.html'
+    context_object_name = 'proyectos'
+    paginate_by = 10
+
+    def get_queryset(self):
+        """
+        Filtra proyectos según parámetros GET y rol del usuario.
+        """
+        queryset = Proyecto.objects.all().select_related('estudiante')
+        
+        # Si el usuario es estudiante, solo mostrar sus propios proyectos
+        if self.request.user.groups.filter(name='estudiante').exists():
+            queryset = queryset.filter(estudiante=self.request.user)
+        
+        # Filtro por estado
+        estado = self.request.GET.get('estado')
+        if estado and estado in ['enviado', 'revision', 'aprobado']:
+            queryset = queryset.filter(estado=estado)
+        
+        # Filtro por estudiante (solo para docentes)
+        if self.request.user.groups.filter(name='docente').exists():
+            estudiante_id = self.request.GET.get('estudiante')
+            if estudiante_id:
+                queryset = queryset.filter(estudiante_id=estudiante_id)
+        
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        """
+        Agrega información adicional al contexto.
+        """
+        context = super().get_context_data(**kwargs)
+        context['is_docente'] = self.request.user.groups.filter(name='docente').exists()
+        context['is_estudiante'] = self.request.user.groups.filter(name='estudiante').exists()
+        
+        # Pasar parámetros de filtro actuales
+        context['current_estado'] = self.request.GET.get('estado', '')
+        context['current_estudiante'] = self.request.GET.get('estudiante', '')
+        
+        # Lista de estudiantes para el filtro (solo docentes)
+        if context['is_docente']:
+            from django.contrib.auth.models import User
+            context['estudiantes'] = User.objects.filter(groups__name='estudiante').order_by('username')
+        
+        return context
+
+
+class ProyectoCreateView(LoginRequiredMixin, CreateView):
+    """
+    Vista para crear un nuevo proyecto.
+    Requisitos: 2.1, 2.2, 15.2
+    """
+    model = Proyecto
+    form_class = ProyectoForm
+    template_name = 'proyectos/proyecto_form.html'
+    success_url = reverse_lazy('dashboard')
+
+    def form_valid(self, form):
+        """
+        Asigna el estudiante automáticamente y establece estado='enviado'.
+        """
+        form.instance.estudiante = self.request.user
+        form.instance.estado = 'enviado'
+        # fecha_envio se establece automáticamente con auto_now_add
+        
+        messages.success(self.request, 'Proyecto creado exitosamente.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Crear Nuevo Proyecto'
+        context['button_text'] = 'Crear Proyecto'
+        return context
+
+
+class ProyectoUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    """
+    Vista para editar un proyecto existente con control de acceso.
+    Requisitos: 2.3, 2.4, 2.7, 4.2, 4.3, 11.4, 11.5, 15.3
+    """
+    model = Proyecto
+    template_name = 'proyectos/proyecto_form.html'
+
+    def get_form_class(self):
+        """
+        Retorna el formulario apropiado según el rol del usuario.
+        """
+        if self.request.user.groups.filter(name='docente').exists():
+            return ProyectoDocenteForm
+        return ProyectoForm
+
+    def get_success_url(self):
+        return reverse_lazy('proyecto_detail', kwargs={'pk': self.object.pk})
+
+    def test_func(self):
+        """
+        Verifica permisos de edición:
+        - Estudiante: solo sus propios proyectos Y estado != 'aprobado'
+        - Docente: cualquier proyecto
+        """
+        proyecto = self.get_object()
+        user = self.request.user
+        
+        # Docente puede editar cualquier proyecto
+        if user.groups.filter(name='docente').exists():
+            return True
+        
+        # Estudiante solo puede editar sus propios proyectos no aprobados
+        if user.groups.filter(name='estudiante').exists():
+            return proyecto.estudiante == user and proyecto.estado != 'aprobado'
+        
+        return False
+
+    def form_valid(self, form):
+        """
+        Actualiza fecha_revision cuando el estado cambia a 'revision' o 'aprobado'.
+        """
+        # Verificar si el estado cambió a 'revision' o 'aprobado'
+        if 'estado' in form.changed_data:
+            if form.instance.estado in ['revision', 'aprobado']:
+                form.instance.fecha_revision = timezone.now()
+        
+        messages.success(self.request, 'Proyecto actualizado exitosamente.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Editar Proyecto'
+        context['button_text'] = 'Guardar Cambios'
+        context['is_update'] = True
+        return context
+
+
+class ProyectoDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    """
+    Vista para eliminar un proyecto con restricciones.
+    Requisitos: 2.5, 2.6, 11.4, 11.5, 15.4
+    """
+    model = Proyecto
+    template_name = 'proyectos/proyecto_confirm_delete.html'
+    success_url = reverse_lazy('dashboard')
+
+    def test_func(self):
+        """
+        Verifica permisos de eliminación:
+        - Solo el propietario puede eliminar
+        - Solo si el estado es 'enviado'
+        """
+        proyecto = self.get_object()
+        user = self.request.user
+        
+        return (
+            proyecto.estudiante == user and 
+            proyecto.estado == 'enviado'
+        )
+
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, 'Proyecto eliminado exitosamente.')
+        return super().delete(request, *args, **kwargs)
+
+
+class ProyectoDetailView(LoginRequiredMixin, DetailView):
+    """
+    Vista de detalle de proyecto con comentarios.
+    Requisitos: 14.1, 14.2, 14.3, 14.4, 14.5, 15.5
+    """
+    model = Proyecto
+    template_name = 'proyectos/proyecto_detail.html'
+    context_object_name = 'proyecto'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        proyecto = self.object
+        
+        # Obtener comentarios ordenados por fecha
+        context['comentarios'] = proyecto.comentarios.all().select_related('usuario')
+        
+        # Verificar si se puede agregar comentarios
+        context['puede_comentar'] = proyecto.estado != 'aprobado'
+        
+        # Formulario de comentario si se puede comentar
+        if context['puede_comentar']:
+            context['comentario_form'] = ComentarioForm()
+        
+        # Verificar permisos de edición y eliminación
+        user = self.request.user
+        context['puede_editar'] = False
+        context['puede_eliminar'] = False
+        
+        if user.groups.filter(name='docente').exists():
+            context['puede_editar'] = True
+        elif user.groups.filter(name='estudiante').exists():
+            if proyecto.estudiante == user:
+                context['puede_editar'] = proyecto.estado != 'aprobado'
+                context['puede_eliminar'] = proyecto.estado == 'enviado'
+        
+        context['is_docente'] = user.groups.filter(name='docente').exists()
+        context['is_estudiante'] = user.groups.filter(name='estudiante').exists()
+        
+        return context
+
+
+class ComentarioCreateView(LoginRequiredMixin, CreateView):
+    """
+    Vista para crear comentarios en proyectos.
+    Requisitos: 5.1, 5.2, 5.4, 5.5, 15.6
+    """
+    model = Comentario
+    form_class = ComentarioForm
+    
+    def dispatch(self, request, *args, **kwargs):
+        """
+        Verifica que el proyecto exista y permita comentarios.
+        """
+        self.proyecto = get_object_or_404(Proyecto, pk=kwargs['proyecto_pk'])
+        
+        # Verificar que el proyecto no esté aprobado
+        if self.proyecto.estado == 'aprobado':
+            messages.error(request, 'No se pueden agregar comentarios a proyectos aprobados.')
+            return redirect('proyecto_detail', pk=self.proyecto.pk)
+        
+        return super().dispatch(request, *args, **kwargs)
+    
+    def form_valid(self, form):
+        """
+        Asigna el usuario y proyecto automáticamente.
+        """
+        form.instance.usuario = self.request.user
+        form.instance.proyecto = self.proyecto
+        
+        messages.success(self.request, 'Comentario agregado exitosamente.')
+        return super().form_valid(form)
+    
+    def get_success_url(self):
+        return reverse_lazy('proyecto_detail', kwargs={'pk': self.proyecto.pk})
