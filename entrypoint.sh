@@ -14,31 +14,50 @@ nslookup $DB_HOST || echo "⚠️  No se pudo resolver el hostname con nslookup"
 ping -c 1 $DB_HOST || echo "⚠️  No se pudo hacer ping al host"
 
 echo "Esperando a que PostgreSQL esté disponible..."
-# Intentar conectar a PostgreSQL con timeout
+# Primero esperar a que el servidor PostgreSQL esté listo
 MAX_RETRIES=30
 RETRY_COUNT=0
 
-until PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; do
+# Intentar conectar al servidor PostgreSQL (usando postgres database por defecto)
+until PGPASSWORD=${DB_PASSWORD:-postgres} psql -h "$DB_HOST" -U "${DB_USER:-postgres}" -d "postgres" -c '\q' 2>/dev/null; do
   RETRY_COUNT=$((RETRY_COUNT + 1))
   if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-    echo "❌ ERROR: No se pudo conectar a PostgreSQL después de $MAX_RETRIES intentos"
+    echo "❌ ERROR: No se pudo conectar al servidor PostgreSQL después de $MAX_RETRIES intentos"
     echo ""
     echo "Diagnóstico:"
     echo "  - Verificar que la base de datos esté ejecutándose"
     echo "  - Verificar que ambos contenedores estén en la misma red Docker"
     echo "  - Verificar las credenciales de la base de datos"
     echo ""
-    echo "Intentando continuar sin esperar a PostgreSQL..."
-    echo "⚠️  La aplicación puede fallar si PostgreSQL no está disponible"
-    break
+    exit 1
   fi
   echo "PostgreSQL no está disponible - esperando... (intento $RETRY_COUNT/$MAX_RETRIES)"
   sleep 2
 done
 
-if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-  echo "✓ PostgreSQL está disponible!"
+echo "✓ Servidor PostgreSQL está disponible!"
+
+# Verificar si la base de datos existe, si no, crearla
+echo "Verificando si la base de datos '$DB_NAME' existe..."
+if ! PGPASSWORD=${DB_PASSWORD:-postgres} psql -h "$DB_HOST" -U "${DB_USER:-postgres}" -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
+    echo "Base de datos '$DB_NAME' no existe. Intentando crearla..."
+    PGPASSWORD=${DB_PASSWORD:-postgres} psql -h "$DB_HOST" -U "${DB_USER:-postgres}" -d "postgres" -c "CREATE DATABASE $DB_NAME;" 2>/dev/null || echo "⚠️  No se pudo crear la base de datos (puede que ya exista o no tengas permisos)"
 fi
+
+# Ahora intentar conectar a la base de datos específica
+RETRY_COUNT=0
+until PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; do
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  if [ $RETRY_COUNT -ge 10 ]; then
+    echo "❌ ERROR: No se pudo conectar a la base de datos '$DB_NAME'"
+    echo "Verifica que el usuario '$DB_USER' tenga permisos en la base de datos '$DB_NAME'"
+    exit 1
+  fi
+  echo "Esperando conexión a la base de datos '$DB_NAME'... (intento $RETRY_COUNT/10)"
+  sleep 2
+done
+
+echo "✓ Conectado exitosamente a la base de datos '$DB_NAME'!"
 
 echo "Aplicando migraciones..."
 python manage.py migrate --noinput
