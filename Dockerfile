@@ -28,7 +28,7 @@ RUN mkdir -p /app/staticfiles
 RUN chmod +x /app/entrypoint.sh
 
 # Cambiar al directorio del proyecto Django
-WORKDIR /app/evaluaciones__nombre__estudiantes
+WORKDIR /app/proyectos_academicos
 
 EXPOSE 8000
 
