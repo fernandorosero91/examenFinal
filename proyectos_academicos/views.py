@@ -1,10 +1,11 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.utils import timezone
+from django.db.models import Avg
 from .models import Proyecto, Comentario
 from .forms import ProyectoForm, ProyectoDocenteForm, ComentarioForm
 
@@ -291,3 +292,47 @@ class ComentarioCreateView(LoginRequiredMixin, CreateView):
     
     def get_success_url(self):
         return reverse_lazy('proyecto_detail', kwargs={'pk': self.proyecto.pk})
+
+
+def es_docente(user):
+    """
+    Helper function para verificar si un usuario es docente.
+    """
+    return user.groups.filter(name='docente').exists()
+
+
+@login_required
+@user_passes_test(es_docente)
+def estadisticas_view(request):
+    """
+    Vista de panel de estadísticas para docentes.
+    Muestra métricas agregadas de proyectos.
+    Requisitos: 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2
+    """
+    # Calcular total de proyectos por estado
+    total_enviados = Proyecto.objects.filter(estado='enviado').count()
+    total_revision = Proyecto.objects.filter(estado='revision').count()
+    total_aprobados = Proyecto.objects.filter(estado='aprobado').count()
+    
+    # Calcular promedio de calificaciones
+    promedio_calificacion = Proyecto.objects.filter(
+        calificacion__isnull=False
+    ).aggregate(Avg('calificacion'))['calificacion__avg']
+    
+    # Calcular total de proyectos sin calificar
+    sin_calificar = Proyecto.objects.filter(calificacion__isnull=True).count()
+    
+    # Total de proyectos
+    total_proyectos = Proyecto.objects.count()
+    
+    # Pasar estadísticas al template
+    context = {
+        'total_enviados': total_enviados,
+        'total_revision': total_revision,
+        'total_aprobados': total_aprobados,
+        'promedio_calificacion': promedio_calificacion,
+        'sin_calificar': sin_calificar,
+        'total_proyectos': total_proyectos,
+    }
+    
+    return render(request, 'estadisticas.html', context)

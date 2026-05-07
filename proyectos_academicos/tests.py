@@ -623,3 +623,298 @@ class ComentarioCreateViewTestCase(TestCase):
             form.fields['texto'].widget.attrs['placeholder'],
             'Escribe tu comentario aquí...'
         )
+
+
+class EstadisticasViewTestCase(TestCase):
+    """
+    Tests para verificar el panel de estadísticas para docentes.
+    Requisitos: 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2, 12.6
+    """
+    
+    def setUp(self):
+        """Configurar datos de prueba"""
+        # Obtener o crear grupos
+        self.grupo_estudiante, _ = Group.objects.get_or_create(name='estudiante')
+        self.grupo_docente, _ = Group.objects.get_or_create(name='docente')
+        
+        # Crear usuarios
+        self.estudiante1 = User.objects.create_user(
+            username='estudiante1',
+            email='estudiante1@test.com',
+            password='testpass123'
+        )
+        self.estudiante1.groups.add(self.grupo_estudiante)
+        
+        self.estudiante2 = User.objects.create_user(
+            username='estudiante2',
+            email='estudiante2@test.com',
+            password='testpass123'
+        )
+        self.estudiante2.groups.add(self.grupo_estudiante)
+        
+        self.docente = User.objects.create_user(
+            username='docente1',
+            email='docente1@test.com',
+            password='testpass123'
+        )
+        self.docente.groups.add(self.grupo_docente)
+        
+        # Crear proyectos con diferentes estados y calificaciones
+        pdf_content = b'%PDF-1.4 fake pdf content'
+        
+        # 2 proyectos enviados (sin calificar)
+        for i in range(2):
+            pdf_file = SimpleUploadedFile(
+                f'proyecto_enviado_{i}.pdf',
+                pdf_content,
+                content_type='application/pdf'
+            )
+            Proyecto.objects.create(
+                titulo=f'Proyecto Enviado {i}',
+                descripcion='Proyecto en estado enviado',
+                estudiante=self.estudiante1,
+                documento=pdf_file,
+                estado='enviado'
+            )
+        
+        # 3 proyectos en revisión (1 sin calificar, 2 con calificación)
+        for i in range(3):
+            pdf_file = SimpleUploadedFile(
+                f'proyecto_revision_{i}.pdf',
+                pdf_content,
+                content_type='application/pdf'
+            )
+            proyecto = Proyecto.objects.create(
+                titulo=f'Proyecto Revisión {i}',
+                descripcion='Proyecto en estado revisión',
+                estudiante=self.estudiante2,
+                documento=pdf_file,
+                estado='revision'
+            )
+            # Solo los primeros 2 tienen calificación
+            if i < 2:
+                proyecto.calificacion = 3.5 + i  # 3.5 y 4.5
+                proyecto.save()
+        
+        # 2 proyectos aprobados (con calificación)
+        for i in range(2):
+            pdf_file = SimpleUploadedFile(
+                f'proyecto_aprobado_{i}.pdf',
+                pdf_content,
+                content_type='application/pdf'
+            )
+            proyecto = Proyecto.objects.create(
+                titulo=f'Proyecto Aprobado {i}',
+                descripcion='Proyecto en estado aprobado',
+                estudiante=self.estudiante1,
+                documento=pdf_file,
+                estado='aprobado',
+                calificacion=4.0 + i * 0.5  # 4.0 y 4.5
+            )
+    
+    def test_estadisticas_requiere_autenticacion(self):
+        """
+        Verificar que la vista de estadísticas requiere autenticación.
+        Requisito: 11.1
+        """
+        response = self.client.get('/estadisticas/')
+        # Debe redirigir al login
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+    
+    def test_estadisticas_requiere_rol_docente(self):
+        """
+        Verificar que solo docentes pueden acceder a estadísticas.
+        Requisitos: 10.1, 11.2
+        """
+        # Intentar acceder como estudiante
+        self.client.login(username='estudiante1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        # Debe redirigir o denegar acceso (302 o 403)
+        self.assertIn(response.status_code, [302, 403])
+    
+    def test_estadisticas_docente_puede_acceder(self):
+        """
+        Verificar que docentes pueden acceder a estadísticas.
+        Requisitos: 10.1, 11.1, 11.2
+        """
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'estadisticas.html')
+    
+    def test_estadisticas_muestra_total_por_estado(self):
+        """
+        Verificar que se muestran totales de proyectos por estado.
+        Requisito: 10.2
+        """
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        # Verificar contexto
+        self.assertEqual(response.context['total_enviados'], 2)
+        self.assertEqual(response.context['total_revision'], 3)
+        self.assertEqual(response.context['total_aprobados'], 2)
+        self.assertEqual(response.context['total_proyectos'], 7)
+    
+    def test_estadisticas_calcula_promedio_calificaciones(self):
+        """
+        Verificar que se calcula el promedio de calificaciones correctamente.
+        Requisito: 10.3
+        """
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        # Promedio: (3.5 + 4.5 + 4.0 + 4.5) / 4 = 16.5 / 4 = 4.125
+        promedio = response.context['promedio_calificacion']
+        self.assertIsNotNone(promedio)
+        self.assertAlmostEqual(float(promedio), 4.125, places=2)
+    
+    def test_estadisticas_muestra_sin_calificar(self):
+        """
+        Verificar que se muestra el total de proyectos sin calificar.
+        Requisito: 10.4
+        """
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        # 2 enviados + 1 en revisión sin calificar = 3 sin calificar
+        self.assertEqual(response.context['sin_calificar'], 3)
+    
+    def test_estadisticas_template_muestra_metricas(self):
+        """
+        Verificar que el template muestra todas las métricas.
+        Requisitos: 10.2, 10.3, 10.4, 10.5
+        """
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        # Verificar que se muestran las métricas en el HTML
+        self.assertContains(response, 'Total de Proyectos')
+        self.assertContains(response, 'Enviados')
+        self.assertContains(response, 'En Revisión')
+        self.assertContains(response, 'Aprobados')
+        self.assertContains(response, 'Promedio de Calificaciones')
+        self.assertContains(response, 'Sin Calificar')
+        
+        # Verificar valores
+        self.assertContains(response, '7')  # Total proyectos
+        self.assertContains(response, '2')  # Enviados
+        self.assertContains(response, '3')  # En revisión
+        self.assertContains(response, '2')  # Aprobados (aparece dos veces)
+        # El promedio puede aparecer como 4,13 o 4.13 dependiendo del locale
+        self.assertTrue('4,13' in response.content.decode() or '4.13' in response.content.decode())
+        self.assertContains(response, '3')  # Sin calificar
+    
+    def test_estadisticas_usa_cards_con_colores(self):
+        """
+        Verificar que las estadísticas usan cards con colores distintivos.
+        Requisito: 12.6
+        """
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        # Verificar colores de badges según diseño
+        self.assertContains(response, 'border-blue-900')  # Total proyectos
+        self.assertContains(response, 'border-blue-500')  # Enviados
+        self.assertContains(response, 'border-amber-500')  # En revisión
+        self.assertContains(response, 'border-emerald-600')  # Aprobados
+        self.assertContains(response, 'border-orange-600')  # Promedio
+        self.assertContains(response, 'border-red-500')  # Sin calificar
+    
+    def test_estadisticas_usa_grid_responsive(self):
+        """
+        Verificar que las estadísticas usan grid responsive de Tailwind.
+        Requisito: 12.6
+        """
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        # Verificar clases de grid responsive
+        self.assertContains(response, 'grid-cols-1')
+        self.assertContains(response, 'sm:grid-cols-2')
+        self.assertContains(response, 'lg:grid-cols-3')
+    
+    def test_estadisticas_muestra_iconos(self):
+        """
+        Verificar que las estadísticas muestran iconos SVG.
+        Requisito: 12.6
+        """
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        # Verificar que hay iconos SVG
+        self.assertContains(response, '<svg')
+        self.assertContains(response, 'viewBox')
+    
+    def test_estadisticas_sin_proyectos(self):
+        """
+        Verificar que las estadísticas funcionan sin proyectos.
+        Requisito: 10.2, 10.3, 10.4
+        """
+        # Eliminar todos los proyectos
+        Proyecto.objects.all().delete()
+        
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_enviados'], 0)
+        self.assertEqual(response.context['total_revision'], 0)
+        self.assertEqual(response.context['total_aprobados'], 0)
+        self.assertEqual(response.context['total_proyectos'], 0)
+        self.assertIsNone(response.context['promedio_calificacion'])
+        self.assertEqual(response.context['sin_calificar'], 0)
+    
+    def test_estadisticas_sin_calificaciones(self):
+        """
+        Verificar que el promedio es None cuando no hay calificaciones.
+        Requisito: 10.3
+        """
+        # Eliminar todas las calificaciones
+        Proyecto.objects.all().update(calificacion=None)
+        
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        self.assertIsNone(response.context['promedio_calificacion'])
+        self.assertEqual(response.context['sin_calificar'], 7)
+    
+    def test_estadisticas_muestra_graficos_visuales(self):
+        """
+        Verificar que las estadísticas incluyen gráficos visuales.
+        Requisito: 12.6 (opcional)
+        """
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        # Verificar que hay visualización de distribución
+        self.assertContains(response, 'Distribución de Proyectos por Estado')
+        # Verificar que hay barras de progreso visuales
+        self.assertContains(response, 'bg-blue-500 h-4 rounded-full')
+        self.assertContains(response, 'bg-amber-500 h-4 rounded-full')
+        self.assertContains(response, 'bg-emerald-600 h-4 rounded-full')
+    
+    def test_estadisticas_tiene_enlace_dashboard(self):
+        """
+        Verificar que hay enlace para volver al dashboard.
+        Requisito: 10.5
+        """
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        self.assertContains(response, 'Volver al Dashboard')
+        self.assertContains(response, 'href="/dashboard/"')
+    
+    def test_estadisticas_tiene_acciones_rapidas(self):
+        """
+        Verificar que hay sección de acciones rápidas.
+        Requisito: 10.5
+        """
+        self.client.login(username='docente1', password='testpass123')
+        response = self.client.get('/estadisticas/')
+        
+        self.assertContains(response, 'Acciones Rápidas')
+        self.assertContains(response, 'Ver Todos los Proyectos')

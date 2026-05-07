@@ -19,4 +19,7 @@ urlpatterns = [
     
     # Crear comentario
     path('proyectos/<int:proyecto_pk>/comentarios/crear/', views.ComentarioCreateView.as_view(), name='comentario_create'),
+    
+    # Estadísticas (solo docentes)
+    path('estadisticas/', views.estadisticas_view, name='estadisticas'),
 ]
