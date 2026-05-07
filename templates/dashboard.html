@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Sistema de Gestión de Proyectos Académicos{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-blue-900">
+                {% if user_role == 'docente' %}
+                    Panel del Docente
+                {% elif user_role == 'estudiante' %}
+                    Panel del Estudiante
+                {% else %}
+                    Panel de Usuario
+                {% endif %}
+            </h1>
+            <p class="text-zinc-600 mt-1">
+                {% if user_role == 'docente' %}
+                    Gestiona y revisa todos los proyectos académicos
+                {% elif user_role == 'estudiante' %}
+                    Administra tus proyectos académicos
+                {% else %}
+                    No tienes un rol asignado. Contacta al administrador.
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Action Buttons - Role Specific -->
+        <div class="flex flex-wrap gap-3">
+            {% if user_role == 'estudiante' %}
+                <!-- Botón de crear proyecto para estudiantes - Requisito 13.4 -->
+                <a href="{% url 'proyecto_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Crear Proyecto
+                </a>
+            {% elif user_role == 'docente' %}
+                <!-- Enlaces para docentes - Requisito 13.5 -->
+                <a href="{% url 'estadisticas' %}" class="inline-flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    Ver Estadísticas
+                </a>
+                <!-- Botones de exportación - Requisitos 8.1, 9.1 -->
+                <a href="{% url 'exportar_csv' %}" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Exportar CSV
+                </a>
+                <a href="{% url 'exportar_pdf' %}" class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                    Exportar PDF
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Stats Cards - Only for users with roles -->
+    {% if user_role != 'sin_rol' %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Total Projects Card -->
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-600">Total de Proyectos</p>
+                    <p class="text-3xl font-bold text-blue-900 mt-2">{{ total_proyectos }}</p>
+                </div>
+                <div class="bg-blue-100 rounded-full p-3">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enviados Card -->
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-600">Enviados</p>
+                    <p class="text-3xl font-bold text-blue-900 mt-2">{{ proyectos|length|add:"0" }}</p>
+                </div>
+                <div class="bg-blue-100 rounded-full p-3">
+                    <svg class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- En Revisión Card -->
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-amber-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-600">En Revisión</p>
+                    <p class="text-3xl font-bold text-amber-600 mt-2">0</p>
+                </div>
+                <div class="bg-amber-100 rounded-full p-3">
+                    <svg class="w-8 h-8 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Projects List Section - Requisitos 12.6, 13.4, 13.5 -->
+    {% if user_role != 'sin_rol' %}
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-zinc-200 bg-zinc-50">
+            <h2 class="text-xl font-semibold text-blue-900">
+                {% if user_role == 'docente' %}
+                    Todos los Proyectos
+                {% else %}
+                    Mis Proyectos
+                {% endif %}
+            </h2>
+        </div>
+
+        {% if proyectos %}
+        <!-- Desktop Table View - Hidden on mobile -->
+        <div class="hidden md:block overflow-x-auto">
+            <table class="min-w-full divide-y divide-zinc-200">
+                <thead class="bg-zinc-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                            Título
+                        </th>
+                        {% if user_role == 'docente' %}
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                            Estudiante
+                        </th>
+                        {% endif %}
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                            Estado
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                            Fecha Envío
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                            Calificación
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                            Acciones
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-zinc-200">
+                    {% for proyecto in proyectos %}
+                    <tr class="hover:bg-zinc-50 transition">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-blue-900">{{ proyecto.titulo }}</div>
+                            <div class="text-sm text-zinc-500 truncate max-w-xs">{{ proyecto.descripcion|truncatewords:10 }}</div>
+                        </td>
+                        {% if user_role == 'docente' %}
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-zinc-900">{{ proyecto.estudiante.get_full_name|default:proyecto.estudiante.username }}</div>
+                        </td>
+                        {% endif %}
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% include 'partials/badge_estado.html' with estado=proyecto.estado %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">
+                            {{ proyecto.fecha_envio|date:"d/m/Y" }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if proyecto.calificacion %}
+                                <span class="text-sm font-semibold text-emerald-600">{{ proyecto.calificacion }}</span>
+                            {% else %}
+                                <span class="text-sm text-zinc-400">Sin calificar</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <a href="{% url 'proyecto_detail' proyecto.pk %}" class="text-blue-900 hover:text-blue-700 transition">
+                                Ver detalles
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Mobile Card View - Visible only on mobile - Requisito 12.6 -->
+        <div class="md:hidden divide-y divide-zinc-200">
+            {% for proyecto in proyectos %}
+            <div class="p-4 hover:bg-zinc-50 transition">
+                <div class="flex items-start justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-blue-900 flex-1">{{ proyecto.titulo }}</h3>
+                    {% include 'partials/badge_estado.html' with estado=proyecto.estado %}
+                </div>
+                
+                {% if user_role == 'docente' %}
+                <p class="text-sm text-zinc-600 mb-2">
+                    <span class="font-medium">Estudiante:</span> {{ proyecto.estudiante.get_full_name|default:proyecto.estudiante.username }}
+                </p>
+                {% endif %}
+                
+                <p class="text-xs text-zinc-500 mb-2">{{ proyecto.descripcion|truncatewords:15 }}</p>
+                
+                <div class="flex items-center justify-between text-xs text-zinc-500 mb-3">
+                    <span>{{ proyecto.fecha_envio|date:"d/m/Y" }}</span>
+                    {% if proyecto.calificacion %}
+                        <span class="font-semibold text-emerald-600">Calificación: {{ proyecto.calificacion }}</span>
+                    {% else %}
+                        <span class="text-zinc-400">Sin calificar</span>
+                    {% endif %}
+                </div>
+                
+                <a href="{% url 'proyecto_detail' proyecto.pk %}" class="inline-flex items-center text-sm text-blue-900 hover:text-blue-700 font-medium transition">
+                    Ver detalles
+                    <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% else %}
+        <!-- Empty State -->
+        <div class="px-6 py-12 text-center">
+            <svg class="mx-auto h-12 w-12 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-zinc-900">
+                {% if user_role == 'estudiante' %}
+                    No tienes proyectos
+                {% else %}
+                    No hay proyectos disponibles
+                {% endif %}
+            </h3>
+            <p class="mt-1 text-sm text-zinc-500">
+                {% if user_role == 'estudiante' %}
+                    Comienza creando tu primer proyecto académico.
+                {% else %}
+                    Los proyectos aparecerán aquí cuando los estudiantes los envíen.
+                {% endif %}
+            </p>
+            {% if user_role == 'estudiante' %}
+            <div class="mt-6">
+                <a href="{% url 'proyecto_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Crear Proyecto
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <!-- No Role Assigned Message -->
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-6 text-center">
+        <svg class="mx-auto h-12 w-12 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+        <h3 class="mt-4 text-lg font-semibold text-amber-900">Sin Rol Asignado</h3>
+        <p class="mt-2 text-sm text-amber-700">
+            No tienes un rol asignado en el sistema. Por favor, contacta al administrador para que te asigne un rol de estudiante o docente.
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

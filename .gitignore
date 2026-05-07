@@ -16,6 +16,8 @@ staticfiles/
 
 
 .env
+.env.local
+.env.production
 
 
 
@@ -32,3 +34,4 @@ staticfiles/
 
 .DS_Store
 Thumbs.db
+.kiro

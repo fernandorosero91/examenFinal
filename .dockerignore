@@ -24,7 +24,6 @@ ENV/
 db.sqlite3
 staticfiles/
 media/
-*.md
 .coverage
 htmlcov/
 .pytest_cache/
