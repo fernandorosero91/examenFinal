@@ -1,0 +1,73 @@
+{% comment %}
+Partial para botones de acción con estilos consistentes
+Requisito: 12.4
+Uso: {% include 'partials/botones_accion.html' with tipo='primary' texto='Guardar' url='#' %}
+Tipos disponibles: primary, secondary, danger, success, warning
+{% endcomment %}
+
+{% if tipo == 'primary' %}
+    <a href="{{ url }}" class="inline-flex items-center px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+        {% if icono %}
+            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                {{ icono|safe }}
+            </svg>
+        {% endif %}
+        {{ texto }}
+    </a>
+
+{% elif tipo == 'secondary' %}
+    <a href="{{ url }}" class="inline-flex items-center px-4 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 text-sm font-medium rounded-lg shadow-sm transition duration-200 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2">
+        {% if icono %}
+            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                {{ icono|safe }}
+            </svg>
+        {% endif %}
+        {{ texto }}
+    </a>
+
+{% elif tipo == 'danger' %}
+    <a href="{{ url }}" class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+        {% if icono %}
+            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                {{ icono|safe }}
+            </svg>
+        {% endif %}
+        {{ texto }}
+    </a>
+
+{% elif tipo == 'success' %}
+    <a href="{{ url }}" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+        {% if icono %}
+            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                {{ icono|safe }}
+            </svg>
+        {% endif %}
+        {{ texto }}
+    </a>
+
+{% elif tipo == 'warning' %}
+    <a href="{{ url }}" class="inline-flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2">
+        {% if icono %}
+            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                {{ icono|safe }}
+            </svg>
+        {% endif %}
+        {{ texto }}
+    </a>
+
+{% elif tipo == 'link' %}
+    <a href="{{ url }}" class="inline-flex items-center text-blue-900 hover:text-blue-700 text-sm font-medium transition duration-200 underline">
+        {% if icono %}
+            <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                {{ icono|safe }}
+            </svg>
+        {% endif %}
+        {{ texto }}
+    </a>
+
+{% else %}
+    {# Default button style #}
+    <a href="{{ url }}" class="inline-flex items-center px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200">
+        {{ texto }}
+    </a>
+{% endif %}

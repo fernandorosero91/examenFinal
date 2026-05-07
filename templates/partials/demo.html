@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% comment %}
+Template de demostración de componentes reutilizables
+Este archivo muestra ejemplos de uso de todos los partials disponibles
+NO es parte de la aplicación - solo para referencia
+{% endcomment %}
+
+{% block title %}Demo de Componentes UI{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold text-blue-900 mb-8">Componentes Reutilizables de UI</h1>
+
+    <!-- Sección: Badges de Estado -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold text-blue-900 mb-4">Badges de Estado</h2>
+        <div class="bg-white rounded-lg shadow p-6 space-y-4">
+            <div class="flex items-center space-x-4">
+                <span class="text-sm font-medium text-gray-700 w-32">Estado Enviado:</span>
+                {% include 'partials/badge_estado.html' with estado='enviado' %}
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm font-medium text-gray-700 w-32">Estado Revisión:</span>
+                {% include 'partials/badge_estado.html' with estado='revision' %}
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm font-medium text-gray-700 w-32">Estado Aprobado:</span>
+                {% include 'partials/badge_estado.html' with estado='aprobado' %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Sección: Botones de Acción -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold text-blue-900 mb-4">Botones de Acción</h2>
+        <div class="bg-white rounded-lg shadow p-6 space-y-4">
+            <div class="flex flex-wrap gap-3">
+                {% include 'partials/botones_accion.html' with tipo='primary' texto='Botón Primary' url='#' %}
+                {% include 'partials/botones_accion.html' with tipo='secondary' texto='Botón Secondary' url='#' %}
+                {% include 'partials/botones_accion.html' with tipo='success' texto='Botón Success' url='#' %}
+                {% include 'partials/botones_accion.html' with tipo='warning' texto='Botón Warning' url='#' %}
+                {% include 'partials/botones_accion.html' with tipo='danger' texto='Botón Danger' url='#' %}
+                {% include 'partials/botones_accion.html' with tipo='link' texto='Botón Link' url='#' %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Sección: Alertas -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold text-blue-900 mb-4">Alertas y Notificaciones</h2>
+        <div class="space-y-4">
+            {% include 'partials/alerta.html' with tipo='success' titulo='¡Éxito!' mensaje='El proyecto ha sido creado correctamente.' dismissible=True %}
+            
+            {% include 'partials/alerta.html' with tipo='error' titulo='Error' mensaje='No se pudo guardar el proyecto. Por favor, verifica los datos.' dismissible=True %}
+            
+            {% include 'partials/alerta.html' with tipo='warning' titulo='Advertencia' mensaje='Este proyecto está en revisión. No podrás editarlo hasta que cambie de estado.' dismissible=True %}
+            
+            {% include 'partials/alerta.html' with tipo='info' mensaje='Los proyectos aprobados no pueden ser modificados ni eliminados.' dismissible=True %}
+        </div>
+    </section>
+
+    <!-- Sección: Ejemplo de Uso Combinado -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold text-blue-900 mb-4">Ejemplo de Uso Combinado</h2>
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Proyecto de Ejemplo</h3>
+                    <p class="text-sm text-gray-600">Estudiante: Juan Pérez</p>
+                </div>
+                {% include 'partials/badge_estado.html' with estado='revision' %}
+            </div>
+            
+            {% include 'partials/alerta.html' with tipo='info' mensaje='Este proyecto está siendo revisado por un docente.' %}
+            
+            <div class="mt-4 flex gap-3">
+                {% include 'partials/botones_accion.html' with tipo='primary' texto='Ver Detalles' url='#' %}
+                {% include 'partials/botones_accion.html' with tipo='secondary' texto='Descargar PDF' url='#' %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Código de Ejemplo -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold text-blue-900 mb-4">Código de Ejemplo</h2>
+        <div class="bg-gray-900 text-gray-100 rounded-lg p-6 overflow-x-auto">
+            <pre class="text-sm"><code>{% templatetag openblock %} include 'partials/badge_estado.html' with estado='enviado' {% templatetag closeblock %}
+
+{% templatetag openblock %} include 'partials/botones_accion.html' with tipo='primary' texto='Guardar' url='/guardar/' {% templatetag closeblock %}
+
+{% templatetag openblock %} include 'partials/alerta.html' with tipo='success' mensaje='Operación exitosa' dismissible=True {% templatetag closeblock %}</code></pre>
+        </div>
+    </section>
+</div>
+{% endblock %}
