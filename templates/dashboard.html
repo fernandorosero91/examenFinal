@@ -31,7 +31,7 @@
         <div class="flex flex-wrap gap-3">
             {% if user_role == 'estudiante' %}
                 <!-- Botón de crear proyecto para estudiantes - Requisito 13.4 -->
-                <a href="#" class="inline-flex items-center px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200">
+                <a href="{% url 'proyecto_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
@@ -179,7 +179,7 @@
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <a href="#" class="text-blue-900 hover:text-blue-700 transition">
+                            <a href="{% url 'proyecto_detail' proyecto.pk %}" class="text-blue-900 hover:text-blue-700 transition">
                                 Ver detalles
                             </a>
                         </td>
@@ -215,7 +215,7 @@
                     {% endif %}
                 </div>
                 
-                <a href="#" class="inline-flex items-center text-sm text-blue-900 hover:text-blue-700 font-medium transition">
+                <a href="{% url 'proyecto_detail' proyecto.pk %}" class="inline-flex items-center text-sm text-blue-900 hover:text-blue-700 font-medium transition">
                     Ver detalles
                     <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
@@ -247,7 +247,7 @@
             </p>
             {% if user_role == 'estudiante' %}
             <div class="mt-6">
-                <a href="#" class="inline-flex items-center px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200">
+                <a href="{% url 'proyecto_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium rounded-lg shadow-sm transition duration-200">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>

@@ -1,36 +1,45 @@
 FROM python:3.12-slim
 
+# Variables de entorno para Python
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 WORKDIR /app
 
-# Instalar dependencias del sistema necesarias para PostgreSQL
+# Instalar dependencias del sistema necesarias para PostgreSQL y herramientas de red
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     postgresql-client \
     libpq-dev \
     dnsutils \
     iputils-ping \
+    curl \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar requirements.txt primero
-COPY requirements.txt /app/requirements.txt
+# Actualizar pip
+RUN pip install --upgrade pip
+
+# Copiar requirements.txt primero para aprovechar cache de Docker
+COPY requirements.txt /app/
 
 # Instalar dependencias Python
-RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el resto del proyecto
 COPY . /app/
 
-# Crear directorio para archivos estáticos
-RUN mkdir -p /app/staticfiles
+# Crear directorios necesarios
+RUN mkdir -p /app/staticfiles /app/media
 
 # Dar permisos al entrypoint
 RUN chmod +x /app/entrypoint.sh
 
-# El WORKDIR debe ser /app donde está manage.py
-WORKDIR /app
+# Crear usuario no-root para seguridad
+RUN adduser --disabled-password --gecos '' appuser && \
+    chown -R appuser:appuser /app
+USER appuser
 
 EXPOSE 8000
 
