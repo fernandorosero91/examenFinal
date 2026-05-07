@@ -9,10 +9,14 @@ from django.contrib.auth import views as auth_views
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic import RedirectView
 from proyectos_academicos import views as app_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # Redirección de la raíz al dashboard
+    path('', RedirectView.as_view(url='/dashboard/', permanent=False), name='home'),
 
     # Autenticación - Requisitos 1.1, 1.2
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
