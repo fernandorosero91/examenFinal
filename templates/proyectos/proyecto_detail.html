@@ -163,21 +163,13 @@
         </div>
         {% endif %}
         
-        <!-- Formulario de comentario - Requisito 14.3 -->
+        <!-- Formulario de comentario - Requisitos 14.3, 14.4, 5.3, 12.2 -->
         {% if puede_comentar %}
         <div class="mt-6 pt-6 border-t border-zinc-200">
             <h3 class="text-lg font-semibold text-zinc-900 mb-4">Agregar Comentario</h3>
-            <form method="post" action="{% url 'comentario_create' proyecto.pk %}" class="space-y-4">
+            <form method="post" action="{% url 'comentario_create' proyecto.pk %}">
                 {% csrf_token %}
-                
-                <div>
-                    <textarea name="texto" 
-                              id="id_texto"
-                              rows="3"
-                              placeholder="Escribe tu comentario aquí..."
-                              class="w-full px-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              required></textarea>
-                </div>
+                {{ comentario_form|crispy }}
                 
                 <button type="submit" 
                         class="bg-orange-600 hover:bg-orange-700 text-white font-medium px-6 py-2 rounded-lg transition duration-200 inline-flex items-center">
