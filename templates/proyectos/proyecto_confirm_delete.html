@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar Proyecto - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-red-600">Eliminar Proyecto</h1>
+        <p class="text-zinc-600 mt-1">Esta acción no se puede deshacer.</p>
+    </div>
+
+    <!-- Confirmación - Requisito 15.4 -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">
+                        ¿Estás seguro de que deseas eliminar este proyecto?
+                    </h3>
+                    <div class="mt-2 text-sm text-red-700">
+                        <p>Esta acción eliminará permanentemente el proyecto y todos sus comentarios asociados.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información del proyecto a eliminar -->
+        <div class="bg-zinc-50 rounded-lg p-4 mb-6">
+            <h3 class="font-semibold text-zinc-900 mb-2">Proyecto a eliminar:</h3>
+            <div class="space-y-2 text-sm">
+                <div>
+                    <span class="font-medium text-zinc-700">Título:</span>
+                    <span class="text-zinc-900">{{ object.titulo }}</span>
+                </div>
+                <div>
+                    <span class="font-medium text-zinc-700">Estado:</span>
+                    {% include 'partials/estado_badge.html' with estado=object.estado %}
+                </div>
+                <div>
+                    <span class="font-medium text-zinc-700">Fecha de envío:</span>
+                    <span class="text-zinc-900">{{ object.fecha_envio|date:"d/m/Y H:i" }}</span>
+                </div>
+                <div>
+                    <span class="font-medium text-zinc-700">Comentarios:</span>
+                    <span class="text-zinc-900">{{ object.comentarios.count }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulario de confirmación -->
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            
+            <div class="flex gap-3">
+                <button type="submit" 
+                        class="bg-red-600 hover:bg-red-700 text-white font-medium px-6 py-3 rounded-lg transition duration-200 inline-flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                    Sí, Eliminar Proyecto
+                </button>
+                <a href="{% url 'proyecto_detail' object.pk %}" 
+                   class="bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-medium px-6 py-3 rounded-lg transition duration-200">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+
+        <!-- Nota informativa -->
+        <div class="mt-6 pt-6 border-t border-zinc-200">
+            <p class="text-sm text-zinc-600">
+                <strong>Nota:</strong> Solo puedes eliminar proyectos que estén en estado "Enviado". 
+                Los proyectos en revisión o aprobados no pueden ser eliminados.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

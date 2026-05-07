@@ -1,0 +1,18 @@
+{% comment %}
+Partial para mostrar badges de estado de proyectos.
+Requisito: 12.4
+{% endcomment %}
+
+{% if estado == 'enviado' %}
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+        Enviado
+    </span>
+{% elif estado == 'revision' %}
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+        En Revisión
+    </span>
+{% elif estado == 'aprobado' %}
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+        Aprobado
+    </span>
+{% endif %}
