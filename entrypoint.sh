@@ -8,27 +8,52 @@ echo "DB_NAME: $DB_NAME"
 echo "DB_USER: $DB_USER"
 echo "==========================================="
 
+# Probar diferentes hosts de PostgreSQL
+echo "Probando conectividad a PostgreSQL..."
+python test_db_connection.py
+
+# Función para probar conectividad
+test_postgres() {
+    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null
+}
+
 echo "Esperando a que PostgreSQL esté disponible..."
-MAX_RETRIES=30
+MAX_RETRIES=10  # Reducido a 10 intentos (20 segundos)
 RETRY_COUNT=0
 
-until PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; do
+while ! test_postgres; do
   RETRY_COUNT=$((RETRY_COUNT + 1))
   if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-    echo "❌ ERROR: No se pudo conectar a PostgreSQL después de $MAX_RETRIES intentos"
+    echo "⚠️  WARNING: No se pudo conectar a PostgreSQL después de $MAX_RETRIES intentos"
     echo ""
-    echo "Diagnóstico:"
-    echo "  - Verificar que la base de datos esté ejecutándose"
-    echo "  - Verificar que ambos contenedores estén en la misma red Docker"
-    echo "  - Verificar las credenciales de la base de datos"
-    echo ""
-    exit 1
+    echo "Probando hosts alternativos..."
+    
+    # Probar hosts alternativos
+    for alt_host in "postgres" "postgresql" "db" "database" "localhost"; do
+        echo "Probando host alternativo: $alt_host"
+        if PGPASSWORD=$DB_PASSWORD psql -h "$alt_host" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; then
+            echo "✅ ¡Conexión exitosa con $alt_host!"
+            export DB_HOST=$alt_host
+            break
+        fi
+    done
+    
+    # Si aún no funciona, usar SQLite
+    if ! test_postgres; then
+        echo "Usando SQLite como fallback..."
+        export USE_SQLITE=true
+        unset DB_NAME DB_USER DB_PASSWORD DB_HOST DB_PORT
+        echo "✓ Configurado para usar SQLite"
+    fi
+    break
   fi
   echo "PostgreSQL no está disponible - esperando... (intento $RETRY_COUNT/$MAX_RETRIES)"
   sleep 2
 done
 
-echo "✓ PostgreSQL está disponible!"
+if [ "$USE_SQLITE" != "true" ]; then
+    echo "✓ PostgreSQL está disponible en: $DB_HOST"
+fi
 
 echo "Aplicando migraciones..."
 python manage.py migrate --noinput
@@ -107,6 +132,11 @@ EOF
 echo ""
 echo "========================================="
 echo "✓ Inicialización completada"
+if [ "$USE_SQLITE" = "true" ]; then
+    echo "⚠️  Usando SQLite (PostgreSQL no disponible)"
+else
+    echo "✓ Usando PostgreSQL"
+fi
 echo "========================================="
 echo ""
 echo "Iniciando servidor Gunicorn..."

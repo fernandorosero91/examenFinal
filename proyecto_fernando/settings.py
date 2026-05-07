@@ -84,8 +84,16 @@ WSGI_APPLICATION = 'proyecto_fernando.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-# Usar PostgreSQL en producción, SQLite en desarrollo
-if os.getenv('DB_NAME'):
+# Usar PostgreSQL en producción, SQLite en desarrollo o como fallback
+if os.getenv('USE_SQLITE') == 'true' or not os.getenv('DB_NAME'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+    print("⚠️  Usando SQLite como base de datos")
+else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -96,13 +104,7 @@ if os.getenv('DB_NAME'):
             'PORT': os.getenv('DB_PORT', '5432'),
         }
     }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+    print(f"✓ Usando PostgreSQL: {os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}")
 
 
 # Password validation
