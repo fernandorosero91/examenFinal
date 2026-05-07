@@ -27,8 +27,8 @@ RUN mkdir -p /app/staticfiles
 # Dar permisos al entrypoint
 RUN chmod +x /app/entrypoint.sh
 
-# Cambiar al directorio del proyecto Django
-WORKDIR /app/proyectos_academicos
+# El WORKDIR debe ser /app donde está manage.py
+WORKDIR /app
 
 EXPOSE 8000
 
